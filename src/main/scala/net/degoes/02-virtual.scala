@@ -52,12 +52,16 @@ class PolyBenchmark {
   @Param(Array("1000", "10000", "100000"))
   var size: Int = _
 
-  var poly_operators: Chunk[Operator] = _
-  // var mono_operators: Chunk[Operator.DividedBy.type] = _
+  var poly_operators: Chunk[Operator]                = _
+  var mono_operators: Chunk[Operator.DividedBy.type] = _
 
   @Setup
   def setupPoly(): Unit =
     poly_operators = Operator.randomN(size)
+
+  @Setup
+  def setupMono(): Unit =
+    mono_operators = Chunk.fill(size)(Operator.DividedBy)
 
   @Benchmark
   def poly(blackhole: Blackhole): Unit = {
@@ -65,6 +69,20 @@ class PolyBenchmark {
     var result = 0
     while (i < size) {
       val operator = poly_operators(i)
+
+      result = operator(result, i + 1)
+
+      i = i + 1
+    }
+    blackhole.consume(result)
+  }
+
+  @Benchmark
+  def mono(blackhole: Blackhole): Unit = {
+    var i      = 0
+    var result = 0
+    while (i < size) {
+      val operator = mono_operators(i)
 
       result = operator(result, i + 1)
 
@@ -109,7 +127,7 @@ class PolyBenchmark {
 /**
  * EXERCISE 2
  *
- * In this exercise, you will simulate the cost of a virtual dispatch by creating a benchark that
+ * In this exercise, you will simulate the cost of a virtual dispatch by creating a benchmark that
  * must lookup the correct method based on the virtual method table stored together with the data
  * for an object.
  *
@@ -137,6 +155,10 @@ class PolySimBenchmark {
   def invokeStatic(blackhole: Blackhole): Unit =
     blackhole.consume(is.address.value)
 
+  @Benchmark
+  def invokeVirtual(blackhole: Blackhole): Unit =
+    blackhole.consume(obj.meta.vtable(iv.method).value)
+
   case class JVMObject(data: Any, meta: JVMClassMetadata)
   case class JVMClassMetadata(clazz: String, vtable: Map[JVMMethod, Address])
   case class JVMMethod(clazz: String, name: String)
@@ -147,4 +169,30 @@ class PolySimBenchmark {
     case class InvokeStatic(address: Address)   extends Bytecode
     case class InvokeVirtual(method: JVMMethod) extends Bytecode
   }
+}
+
+@State(Scope.Thread)
+@OutputTimeUnit(TimeUnit.MILLISECONDS)
+@BenchmarkMode(Array(Mode.Throughput))
+@Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
+@Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
+@Fork(1)
+@Threads(1)
+class MyOwnBenchmark {
+  object Test1 {
+    lazy val doSomething: Option[Int]    = doAnotherThing.flatMap(v => Some(v + 1))
+    lazy val doAnotherThing: Option[Int] = Some(2)
+  }
+  object Test2 {
+    def doSomething: Option[Int]    = doAnotherThing.flatMap(v => Some(v + 1))
+    def doAnotherThing: Option[Int] = Some(2)
+  }
+
+  @Benchmark
+  def test1(blackhole: Blackhole): Unit =
+    blackhole.consume(Test1.doSomething)
+
+  @Benchmark
+  def test2(blackhole: Blackhole): Unit =
+    blackhole.consume(Test2.doSomething)
 }

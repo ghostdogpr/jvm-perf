@@ -19,10 +19,10 @@ import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import java.util.concurrent.TimeUnit
 
-final case class Person(id: Int, age: Int, name: String, follows: List[Int])
+final case class Person(id: Int, age: Int, name: String, follows: Set[Int])
 
-final case class SocialNetwork(people: Seq[Person]) {
-  def getFriendsOf(id: Int): Seq[Int] = {
+final case class SocialNetwork(people: Vector[Person]) {
+  def getFriendsOf(id: Int): Set[Int] = {
     // Retrieve all the people that $id follows:
     val follows = people(id).follows
 
@@ -46,7 +46,7 @@ final case class SocialNetwork(people: Seq[Person]) {
     mostPopular.map(_._1)
   }
 }
-object SocialNetwork                                {
+object SocialNetwork                                   {
   // Deterministic RNG:
   private val rng = new scala.util.Random(0L)
 
@@ -59,9 +59,9 @@ object SocialNetwork                                {
           s"Person $id",
           (0 until friendsPerPerson).map { _ =>
             rng.nextInt(people)
-          }.toList
+          }.toSet
         )
-      }
+      }.toVector
     }
 }
 
@@ -104,7 +104,28 @@ object SocialNetwork                                {
  * performance. Test your potential improvements using the benchmark, and do not stop iterating
  * until you have found a solution that scales better with both network size and friend count.
  */
+
+@State(Scope.Thread)
+@OutputTimeUnit(TimeUnit.SECONDS)
+@BenchmarkMode(Array(Mode.Throughput))
+@Warmup(iterations = 5, time = 100, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 5, time = 100, timeUnit = TimeUnit.MILLISECONDS)
+@Fork(1)
+@Threads(1)
 class FindMostPopularFriendBenchmark {
+  @Param(Array("100", "1000", "10000"))
+  var networkSize: Int = _
+
+  @Param(Array("10", "100", "1000"))
+  var friendsPerPerson: Int = _
+
+  var network: SocialNetwork = _
+
+  @Setup
+  def setup(): Unit =
+    network = SocialNetwork.random(networkSize, friendsPerPerson)
+
   @Benchmark
-  def findMostPopularFriend(blackHole: Blackhole): Unit = ()
+  def findMostPopularFriend(blackHole: Blackhole): Unit =
+    blackHole.consume(network.findMostPopularFriend)
 }

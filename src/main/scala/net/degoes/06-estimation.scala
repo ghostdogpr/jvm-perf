@@ -180,7 +180,7 @@ class Estimation3Benchmark {
     def isInt(s: String): Boolean =
       try {
         s.toInt
-        false
+        true
       } catch {
         case _: NumberFormatException => false
       }
@@ -231,9 +231,9 @@ class Estimation4Benchmark {
   val Adders: Array[Int => Int] =
     Array(_ + 1, _ + 2, _ + 3, _ + 4, _ + 5)
 
-  var operations1: Array[Int => Int]          = _
-  var operations2: Array[ElementChanger[Int]] = _
-  var operations3: Array[IntegerChanger]      = _
+  var operations1: Array[Int => Int]          = _ // virtual dispatch
+  var operations2: Array[ElementChanger[Int]] = _ // boxing
+  var operations3: Array[IntegerChanger]      = _ // static dispatch
 
   @Setup
   def setup(): Unit = {
